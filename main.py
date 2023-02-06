@@ -14,7 +14,7 @@ db = SQLAlchemy(app)
 
 class User(db.Model):
     __tablename__ = "user"
-    id = db.Column(db.Integer, primare_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(100))
     last_name = db.Column(db.String(100))
     age = db.Column(db.Integer)
@@ -36,15 +36,15 @@ class User(db.Model):
 
 class Order(db.Model):
     __tablename__ = "order"
-    id = db.Column(db.Integer, primare_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100))
-    decription = db.Column(db.String(100))
+    description = db.Column(db.String(100))
     start_date = db.Column(db.String())
     end_date = db.Column(db.String())
     address = db.Column(db.String(255))
     price = db.Column(db.Integer)
     customer_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-    executer_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    executor_id = db.Column(db.Integer, db.ForeignKey("user.id"))
 
     def to_dict(self):
         return {
@@ -60,16 +60,72 @@ class Order(db.Model):
         }
 
 
-@app.route("/users", methods=["GET", "POST"])
+class Offer(db.Model):
+    __tablename__ = "offer"
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id"))
+    executor_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "age": self.age
+        }
+
+
+def init_database():
+    db.drop_all()
+    db.create_all()
+
+    for user_data in raw_data.users:
+        new_user = User(
+            id=user_data["id"],
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            age=user_data["age"],
+            email=user_data["email"],
+            role=user_data["role"],
+            phone=user_data["phone"],
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+    for order_data in raw_data.orders:
+        new_order = Order(
+            id=order_data["id"],
+            name=order_data["name"],
+            description=order_data["description"],
+            start_date=order_data["start_date"],
+            end_date=order_data["end_date"],
+            address=order_data["address"],
+            price=order_data["price"],
+            customer_id=order_data["customer_id"],
+            executor_id=order_data["executor_id"],
+        )
+        db.session.add(new_order)
+        db.session.commit()
+
+    for offer_data in raw_data.offers:
+        new_offer = Offer(
+            id=offer_data["id"],
+            order_id=offer_data["order_id"],
+            executor_id=offer_data["executor_id"],
+        )
+        db.session.add(new_offer)
+        db.session.commit()
+
+
+@app.route("/users", methods=['GET', 'POST'])
 def users():
     if request.method == "GET":
-        result = []
+        res = []
         for u in User.query.all():
-            result.append(u.to_dict())
+            res.append(u.to_dict())
 
-        return json.dumps(result), 200
-
-    if request.method == "POST":
+        return json.dumps(res), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    elif request.method == "POST":
         user_data = json.loads(request.data)
         new_user = User(
             id=user_data["id"],
@@ -78,16 +134,14 @@ def users():
             age=user_data["age"],
             email=user_data["email"],
             role=user_data["role"],
-            phone=user_data["phone"]
+            phone=user_data["phone"],
         )
-
         db.session.add(new_user)
         db.session.commit()
+        return "", 201
 
-        return "User created", 201
 
-
-@app.route("users/<int::uid>", methods=["GET", "PUT", "DELETE"])
+@app.route("/users/<int:uid>", methods=['GET', 'PUT', 'DELETE'])
 def user(uid: int):
     if request.method == "GET":
         return json.dumps(User.query.get(uid).to_dict()), 200
@@ -210,66 +264,9 @@ def offer(oid: int):
         return "", 204
 
 
-class Offer(db.Model):
-    __tablename__ = "offer"
-    id = db.Column(db.Integer, primare_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey("order.id"))
-    executor_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "first_name": self.first_name,
-            "last_name": self.last_name,
-            "age": self.age
-        }
-
-
 # init DB
-def init_database():
-    db.drop_all()
-    db.create_all()
 
-    for user_data in raw_data.users:
-        new_user = User(
-            id=user_data["id"],
-            first_name=user_data["first_name"],
-            last_name=user_data["last_name"],
-            age=user_data["age"],
-            email=user_data["email"],
-            role=user_data["role"],
-            phone=user_data["phone"]
-        )
-
-        db.session.add(new_user)
-        db.session.commit()
-
-    for order_data in raw_data.orders:
-        new_order = User(
-            id=order_data["id"],
-            name=order_data["name"],
-            description=order_data["description"],
-            start_date=order_data["start_date"],
-            end_date=order_data["end_date"],
-            address=order_data["address"],
-            price=order_data["price"],
-            customer_id=order_data["customer_id"],
-            executor_id=order_data["executor_id"]
-        )
-
-        db.session.add(new_order)
-        db.session.commit()
-
-    for offer_data in raw_data.offers:
-        new_offer = Offer(
-            id=offer_data["id"],
-            order=offer_data["order_id"],
-            executor_id=offer_data["executor_id"]
-        )
-
-        db.session.add(new_offer)
-        db.session.commit()
-
-
+init_database()
+# s
 if __name__ == '__main__':
     app.run(debug=True)
